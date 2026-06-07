@@ -47,8 +47,6 @@ function serializeVehicle(v: VehicleDocument): VehicleDTO {
     fuelType: v.fuelType,
     bodyStyle: v.bodyStyle,
     engineType: v.engineType,
-    horsepower: v.horsepower,
-    torque: v.torque,
     location: v.location,
     phoneNumber: v.phoneNumber,
     imageUrl: v.imageUrl,
