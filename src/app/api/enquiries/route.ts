@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     const enquiry = await Enquiry.create({
       vehicleId,
-      sellerId: (vehicle as { sellerId: unknown }).sellerId,
+      sellerId: (vehicle as unknown as { sellerId: unknown }).sellerId,
       buyerName,
       buyerEmail,
       buyerPhone,
