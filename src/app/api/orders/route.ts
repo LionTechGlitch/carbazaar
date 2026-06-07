@@ -3,8 +3,7 @@ import { connectDB } from "@/lib/db";
 import Enquiry from "@/models/Enquiry";
 import Vehicle from "@/models/Vehicle";
 import { getCurrentUser } from "@/lib/auth";
-import { Types } from "mongoose";
-  
+
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
@@ -15,15 +14,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "All fields are required" }, { status: 400 });
     }
 
-    const vehicle = await Vehicle.findById(vehicleId).select("sellerId").lean();
+    const vehicle = await Vehicle.findById(vehicleId).lean();
     if (!vehicle) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
 
     const enquiry = await Enquiry.create({
       vehicleId,
-      
-      buyerName,sellerId: (vehicle as {sellerId: (vehicle as unknown as { sellerId: unknown }).sellerId,
+      sellerId: (vehicle as unknown as { sellerId: unknown }).sellerId,
+      buyerName,
       buyerEmail,
       buyerPhone,
       message,
@@ -59,7 +58,7 @@ export async function GET(req: NextRequest) {
       } | null;
 
       return {
-        id: (e._id as unknown as { _id: Types.ObjectId })._id.toString(),
+        id: String(e._id),
         buyerName: e.buyerName,
         buyerEmail: e.buyerEmail,
         buyerPhone: e.buyerPhone,
@@ -67,7 +66,7 @@ export async function GET(req: NextRequest) {
         createdAt: e.createdAt,
         vehicle: v
           ? {
-              id: v._id?.toString(),
+              id: String(v._id),
               make: v.make,
               model: v.model,
               year: v.year,
