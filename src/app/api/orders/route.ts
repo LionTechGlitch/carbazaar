@@ -1,84 +1,147 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
-import Enquiry from "@/models/Enquiry";
+import Order from "@/models/Order";
 import Vehicle from "@/models/Vehicle";
 import { getCurrentUser } from "@/lib/auth";
+import { orderSchema } from "@/lib/validations";
 
-export async function POST(req: NextRequest) {
-  try {
-    await connectDB();
-    const body = await req.json();
-    const { vehicleId, buyerName, buyerEmail, buyerPhone, message } = body;
+interface PopulatedUser {
+  firstName: string;
+  lastName: string;
+}
 
-    if (!vehicleId || !buyerName || !buyerEmail || !buyerPhone || !message) {
-      return NextResponse.json({ error: "All fields are required" }, { status: 400 });
-    }
+interface PopulatedVehicle {
+  _id: mongoose.Types.ObjectId;
+  make: string;
+  model: string;
+  year: number;
+  price: number;
+  images?: string[];
+}
 
-    const vehicle = await Vehicle.findById(vehicleId).lean();
-    if (!vehicle) {
-      return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
-    }
-
-    const enquiry = await Enquiry.create({
-      vehicleId,
-      sellerId: (vehicle as unknown as { sellerId: unknown }).sellerId,
-      buyerName,
-      buyerEmail,
-      buyerPhone,
-      message,
-    });
-
-    return NextResponse.json({ success: true, enquiryId: enquiry._id });
-  } catch (err) {
-    console.error("Enquiry POST error:", err);
-    return NextResponse.json({ error: "Failed to submit enquiry" }, { status: 500 });
-  }
+interface LeanOrder {
+  _id: mongoose.Types.ObjectId;
+  vehicleId?: PopulatedVehicle | null;
+  amount: number;
+  currency: string;
+  status: string;
+  paymentMethod?: string;
+  isAuction: boolean;
+  createdAt: Date;
+  buyerId?: PopulatedUser | null;
+  sellerId?: PopulatedUser | null;
 }
 
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
     const user = await getCurrentUser(req);
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const enquiries = await Enquiry.find({ sellerId: user._id })
-      .populate("vehicleId", "make model year images")
+    const orders = await Order.find({ $or: [{ buyerId: user._id }, { sellerId: user._id }] })
       .sort({ createdAt: -1 })
+      .populate("vehicleId", "make model year price images")
+      .populate("buyerId", "firstName lastName email")
+      .populate("sellerId", "firstName lastName email")
       .lean();
 
-    const list = enquiries.map((e) => {
-      const v = e.vehicleId as {
-        _id: unknown;
-        make: string;
-        model: string;
-        year: number;
-        images?: string[];
-      } | null;
+    const list = (orders as unknown as LeanOrder[]).map((o) => ({
+      id: o._id.toString(),
+      vehicleId: o.vehicleId?._id?.toString(),
+      vehicle: o.vehicleId
+        ? {
+            make: o.vehicleId.make,
+            model: o.vehicleId.model,
+            year: o.vehicleId.year,
+            price: o.vehicleId.price,
+            image: o.vehicleId.images?.[0],
+          }
+        : null,
+      amount: o.amount,
+      currency: o.currency,
+      status: o.status,
+      paymentMethod: o.paymentMethod,
+      isAuction: o.isAuction,
+      createdAt: o.createdAt,
+      buyer: o.buyerId
+        ? { firstName: o.buyerId.firstName, lastName: o.buyerId.lastName }
+        : null,
+      seller: o.sellerId
+        ? { firstName: o.sellerId.firstName, lastName: o.sellerId.lastName }
+        : null,
+    }));
 
-      return {
-        id: String(e._id),
-        buyerName: e.buyerName,
-        buyerEmail: e.buyerEmail,
-        buyerPhone: e.buyerPhone,
-        message: e.message,
-        createdAt: e.createdAt,
-        vehicle: v
-          ? {
-              id: String(v._id),
-              make: v.make,
-              model: v.model,
-              year: v.year,
-              image: v.images?.[0] || "",
-            }
-          : null,
-      };
+    return NextResponse.json({ orders: list });
+  } catch (err) {
+    console.error("Orders GET error:", err);
+    return NextResponse.json({ error: "Failed to fetch orders" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    await connectDB();
+    const user = await getCurrentUser(req);
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const body = await req.json();
+    const parsed = orderSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+    const { vehicleId, amount, paymentMethod } = parsed.data;
+
+    if (!mongoose.Types.ObjectId.isValid(vehicleId)) {
+      return NextResponse.json({ error: "Invalid vehicle ID" }, { status: 400 });
+    }
+
+    const vehicle = await Vehicle.findById(vehicleId);
+    if (!vehicle) return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
+    if (vehicle.isSold) return NextResponse.json({ error: "Vehicle is already sold" }, { status: 400 });
+    if (vehicle.sellerId.toString() === user._id.toString()) {
+      return NextResponse.json({ error: "Cannot order your own listing" }, { status: 400 });
+    }
+
+    let orderAmount = vehicle.price;
+    let isAuction = false;
+
+    if (vehicle.listingType === "auction") {
+      isAuction = true;
+      orderAmount = vehicle.currentBid ?? vehicle.price;
+      if (amount != null && amount > (vehicle.currentBid ?? 0)) {
+        orderAmount = amount;
+      }
+    } else if (amount != null && amount > 0) {
+      orderAmount = amount;
+    }
+
+    const order = await Order.create({
+      vehicleId: vehicle._id,
+      buyerId: user._id,
+      sellerId: vehicle.sellerId,
+      amount: orderAmount,
+      currency: "USD",
+      status: "pending",
+      paymentMethod: paymentMethod || undefined,
+      isAuction,
     });
 
-    return NextResponse.json({ enquiries: list });
+    return NextResponse.json({
+      order: {
+        id: order._id,
+        vehicleId: order.vehicleId,
+        amount: order.amount,
+        currency: order.currency,
+        status: order.status,
+        isAuction: order.isAuction,
+      },
+    });
   } catch (err) {
-    console.error("Enquiry GET error:", err);
-    return NextResponse.json({ error: "Failed to fetch enquiries" }, { status: 500 });
+    console.error("Orders POST error:", err);
+    return NextResponse.json({ error: "Failed to create order" }, { status: 500 });
   }
 }
