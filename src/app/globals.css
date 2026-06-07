@@ -79,6 +79,20 @@ input[type="text"].text-gray-900 {
   color: var(--color-kairo-ink-subtle);
 }
 
+/* White cards nested on dark pages (e.g. Sell My Car) — override .bg-kairo-bg input */
+.bg-kairo-bg .bg-white input:not([type="checkbox"]):not([type="radio"]),
+.bg-kairo-bg .bg-white textarea,
+.bg-kairo-bg .bg-white select {
+  color: #111827;
+  -webkit-text-fill-color: #111827;
+}
+
+.bg-kairo-bg .bg-white input::placeholder,
+.bg-kairo-bg .bg-white textarea::placeholder {
+  color: #9ca3af;
+  -webkit-text-fill-color: #9ca3af;
+}
+
 * {
   box-sizing: border-box;
 }
