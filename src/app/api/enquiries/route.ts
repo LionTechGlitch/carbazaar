@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
       } | null;
 
       return {
-        id: e._id.toString(),
+        id: (e._id as unknown as { toString: () => string }).toString(),
         buyerName: e.buyerName,
         buyerEmail: e.buyerEmail,
         buyerPhone: e.buyerPhone,
