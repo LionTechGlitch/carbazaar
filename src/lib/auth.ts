@@ -47,7 +47,7 @@ export const getServerUserId = cache(async (): Promise<string | null> => {
   if (!decoded) return null;
   await connectDB();
   const user = await User.findById(decoded.userId).select("_id").lean();
-  return user?._id?.toString() ?? null;
+  return (user as unknown as { _id: { toString: () => string } })?._id?.toString() ?? null;
 });
 
 export function setAuthCookie(res: NextResponse, token: string) {
