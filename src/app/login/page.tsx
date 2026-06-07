@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "../components/Navbar";
@@ -8,7 +8,7 @@ import Footer from "../components/Footer";
 import PasswordInput from "../components/PasswordInput";
 import { showToast } from "@/lib/toast";
 
-export default function LoginPage() {
+function LoginForm() {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -28,7 +28,6 @@ export default function LoginPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    // Clear error when user starts typing
     if (errors[name as keyof typeof errors]) {
       setErrors((prev) => ({ ...prev, [name]: undefined }));
     }
@@ -40,7 +39,6 @@ export default function LoginPage() {
     setSubmitError("");
     const newErrors: { email?: string; password?: string } = {};
 
-    // Validation
     if (!formData.email) {
       newErrors.email = "Email is required";
     } else if (!validateEmail(formData.email)) {
@@ -87,109 +85,100 @@ export default function LoginPage() {
   };
 
   return (
+    <div className="bg-white rounded-2xl shadow-xl p-8 border border-kairo-border/30">
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold text-kairo-deep mb-2">
+          Welcome <span className="text-kairo-gold">Back</span>
+        </h1>
+        <p className="text-gray-600">Sign in to your account to continue</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
+            Email Address
+          </label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all ${
+              errors.email
+                ? "border-red-500 focus:ring-red-500"
+                : "border-gray-300 focus:ring-kairo-gold focus:border-transparent"
+            }`}
+            placeholder="you@example.com"
+          />
+          {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+        </div>
+
+        <div>
+          <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
+            Password
+          </label>
+          <PasswordInput
+            id="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            error={!!errors.password}
+            placeholder="Enter your password"
+          />
+          {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <input
+              id="remember"
+              type="checkbox"
+              className="w-4 h-4 text-kairo-gold border-gray-300 rounded focus:ring-kairo-gold"
+            />
+            <label htmlFor="remember" className="ml-2 text-sm text-gray-600">
+              Remember me
+            </label>
+          </div>
+          <Link href="/forgot-password" className="text-sm text-kairo-gold hover:underline font-medium">
+            Forgot password?
+          </Link>
+        </div>
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full py-3 bg-kairo-gold text-kairo-deep font-semibold rounded-lg hover:bg-kairo-gold-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isSubmitting ? "Signing in..." : "Sign In"}
+        </button>
+        {submitError && <p className="text-sm text-red-600 text-center">{submitError}</p>}
+      </form>
+
+      <div className="mt-6 text-center">
+        <p className="text-gray-600">
+          Don&apos;t have an account?{" "}
+          <Link href="/signup" className="text-kairo-gold hover:underline font-semibold">
+            Sign up
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
     <div className="min-h-screen flex flex-col bg-kairo-bg">
       <Navbar />
       <main className="flex-1 flex items-center justify-center py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full">
-          <div className="bg-white rounded-2xl shadow-xl p-8 border border-kairo-border/30">
-            <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold text-kairo-deep mb-2">
-                Welcome <span className="text-kairo-gold">Back</span>
-              </h1>
-              <p className="text-gray-600">Sign in to your account to continue</p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Email Field */}
-              <div>
-                <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all ${
-                    errors.email
-                      ? "border-red-500 focus:ring-red-500"
-                      : "border-gray-300 focus:ring-kairo-gold focus:border-transparent"
-                  }`}
-                  placeholder="you@example.com"
-                />
-                {errors.email && (
-                  <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-                )}
-              </div>
-
-              {/* Password Field */}
-              <div>
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-semibold text-gray-700 mb-2"
-                >
-                  Password
-                </label>
-                <PasswordInput
-                  id="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  error={!!errors.password}
-                  placeholder="Enter your password"
-                />
-                {errors.password && (
-                  <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-                )}
-              </div>
-
-              {/* Remember Me & Forgot Password */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <input
-                    id="remember"
-                    type="checkbox"
-                    className="w-4 h-4 text-kairo-gold border-gray-300 rounded focus:ring-kairo-gold"
-                  />
-                  <label htmlFor="remember" className="ml-2 text-sm text-gray-600">
-                    Remember me
-                  </label>
-                </div>
-                <Link href="/forgot-password" className="text-sm text-kairo-gold hover:underline font-medium">
-                  Forgot password?
-                </Link>
-              </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-3 bg-kairo-gold text-kairo-deep font-semibold rounded-lg hover:bg-kairo-gold-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? "Signing in..." : "Sign In"}
-              </button>
-              {submitError && <p className="text-sm text-red-600 text-center">{submitError}</p>}
-            </form>
-
-            {/* Sign Up Link */}
-            <div className="mt-6 text-center">
-              <p className="text-gray-600">
-                Don&apos;t have an account?{" "}
-                <Link href="/signup" className="text-kairo-gold hover:underline font-semibold">
-                  Sign up
-                </Link>
-              </p>
-            </div>
-          </div>
+          <Suspense fallback={<div className="text-kairo-ink text-center">Loading...</div>}>
+            <LoginForm />
+          </Suspense>
         </div>
       </main>
       <Footer />
     </div>
   );
 }
-
-
-
-
-
